@@ -33,7 +33,8 @@ import {
   then,
   manyBetween,
   flatten,
-  mapConst
+  mapConst,
+  not
 } from 'parjs/combinators'
 import { visualizeTrace } from 'parjs/trace'
 import { ParjsSuccess } from 'parjs/internal/result'
@@ -55,6 +56,28 @@ export function activate (context: vscode.ExtensionContext) {
   // The command has been defined in the package.json file
   // Now provide the implementation of the command with registerCommand
   // The commandId parameter must match the command field in package.json
+  class SassClassDefinitionProvider implements vscode.DefinitionProvider {
+    provideDefinition (
+      document: vscode.TextDocument,
+      position: vscode.Position,
+      token: vscode.CancellationToken
+    ) {
+      const workspace = vscode.workspace.getWorkspaceFolder(document.uri)
+      const root = workspace ? workspace.uri : document.uri
+      return new vscode.Location(
+        root.with({
+          path: root.path
+        }),
+        new vscode.Position(0, 1)
+      )
+    }
+  }
+  context.subscriptions.push(
+    vscode.languages.registerDefinitionProvider(
+      { scheme: 'file', language: 'vue' },
+      new SassClassDefinitionProvider()
+    )
+  )
   let disposable = vscode.commands.registerCommand(
     'vue-sass-peek.vue-sass-peek',
     () => {
@@ -73,9 +96,12 @@ export function activate (context: vscode.ExtensionContext) {
         className: string
         classContent: string
 
-        constructor (className: string, classContent: string) {
+        constructor (className: string, classContent: string[]) {
           this.className = className
-          this.classContent = classContent
+          this.classContent = classContent.reduce(
+            (acc, content) => acc + content,
+            ''
+          )
           return this
         }
       }
@@ -85,25 +111,36 @@ export function activate (context: vscode.ExtensionContext) {
       //   /(?:<style.*>)((?<sassText>.*)|(?:\r\n))*(?:<\/style>)/
       // )
       // console.log(sassText)
-      const classIdentifier = regexp(/.[^ \r\n]*/)
+      const classIdentifier = regexp(/\S*/)
       const sassClassName = string('.')
         .pipe(qthen(classIdentifier))
-        .pipe(between(whitespace()))
-      const sassClassContent = regexp(/.[^\.<]*(?:\r\n)*/)
-      const singleSassClass = sassClassName.pipe(then(sassClassContent))
+        .pipe(thenq(regexp(/[^\S\r\n]*\r\n/)))
+      const styleOpenTag = regexp(/\s*<style.*>\s*/)
+      const styleCloseTag = regexp(/\s*<\/style>\s*/)
+      const sassClassContentLine = regexp(/(?:[^\S\r\n]+.*)?(?:\r\n)/).pipe(
+        map(val => val[0])
+      )
+      const sassClassContent = sassClassContentLine.pipe(
+        // manyTill(sassClassName.pipe(or(styleCloseTag)))
+        many()
+      )
+      // const sassClassContent = sassClassContentLine.pipe(many())
+      const singleSassClass = sassClassName
+        .pipe(then(sassClassContent))
+        .pipe(between(regexp(/(?:\r\n)*/)))
       const sassComment = string('//').pipe(then(regexp(/.*\r\n/)))
       const sassClasses = sassComment
+        .pipe(or(/\r\n/))
         .pipe(many())
         .pipe(qthen(singleSassClass.pipe(many())))
       const sassParser = sassClasses.pipe(
         map(val => {
           return val.map(values => {
-            return new SassClass(values[0][0], values[1][0])
+            return new SassClass(values[0][0], values[1])
           })
         })
       )
-      const styleOpenTag = regexp(/(\r\n)*<style.*>(\r\n)*/)
-      const styleCloseTag = regexp(/(\r\n)*<\/style>(\r\n)*/)
+
       const otherPrevText = regexp(/(.*\r\n)/).pipe(manyTill(styleOpenTag))
       const otherAfterText = regexp(/(.*\r\n)/).pipe(manyTill(eof()))
       // const styleTag = sassClasses.pipe(between(styleOpenTag, styleCloseTag))
@@ -112,7 +149,7 @@ export function activate (context: vscode.ExtensionContext) {
         .pipe(thenq(styleCloseTag))
         .pipe(thenq(otherAfterText))
 
-      console.log(vueSassParser.parse(targetText ?? ''))
+      const sassClassesParjser = vueSassParser.parse(targetText ?? '')
     }
   )
   context.subscriptions.push(disposable)
