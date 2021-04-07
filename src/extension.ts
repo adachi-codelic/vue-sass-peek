@@ -44,7 +44,10 @@ export function activate (context: vscode.ExtensionContext) {
         .pipe(thenq(nl.newline()))
 
       const styleOpenTag = regexp(/\s*<style.*>\s*/)
-      const styleCloseTag = regexp(/\s*<\/style>\s*/)
+      const styleCloseTag = spaces
+        .pipe(then(string('</style>')))
+        .pipe(then(spaces))
+        .pipe(then(nl.newline()))
       const sassClassContentLine = regexp(/.*/)
         .pipe(thenq(nl.newline()))
         .pipe(map(val => val[0]))
@@ -55,6 +58,8 @@ export function activate (context: vscode.ExtensionContext) {
         .pipe(then(nl.newline()))
         .pipe(map(val => val[0][0][0][0] + val[0][0][1] + val[0][1] + val[1]))
 
+      // sassParserがstyleタグまで消費している
+      // たぶんここ
       const sassClassContent = sassClassContentLine
         .pipe(or(mediaQuery))
         .pipe(many())
@@ -71,7 +76,7 @@ export function activate (context: vscode.ExtensionContext) {
         .pipe(between(regexp(/(?:\r\n|\s*\/\/.*(?:\r\n))*/)))
         .pipe(then(pos.position()))
       const sassClasses = sassComment
-        .pipe(or(/(\r\n|\n)/))
+        .pipe(or(nl.newline()))
         .pipe(many())
         .pipe(qthen(singleSassClass.pipe(many())))
       const sassParser = sassClasses.pipe(
