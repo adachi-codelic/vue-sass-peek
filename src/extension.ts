@@ -12,7 +12,8 @@ import {
   manyTill,
   then,
   flatten,
-  backtrack
+  backtrack,
+  recover
 } from 'parjs/combinators'
 import * as pos from 'parjs/internal/parsers/position'
 import * as nl from 'parjs/internal/parsers/newline'
@@ -94,6 +95,19 @@ export function activate (context: vscode.ExtensionContext) {
           )
         )
         .pipe(then(pos.position()))
+        .pipe(thenq(sassClassName))
+      // console.log(
+      //   sassClassContentLine
+      //     .pipe(
+      //       manyTill(
+      //         string('.')
+      //           .pipe(then(regexp(/.*/)))
+      //           .pipe(then(nl.newline()))
+      //       )
+      //     )
+      //     .parse('  aaa\n.b\n')
+      // )
+      console.log(singleSassClass.parse('.aaa\n bbb: ccc\n.b\n'))
       const sassClasses = singleSassClass.pipe(many())
 
       const sassParser = sassClasses.pipe(
@@ -123,7 +137,7 @@ export function activate (context: vscode.ExtensionContext) {
         .pipe(thenq(rest()))
 
       const sassClassesParjser = vueSassParser.parse(targetText ?? '')
-      console.log(sassClassesParjser)
+      // console.log(sassClassesParjser)
       const definedSassClasses = sassClassesParjser.isOk
         ? sassClassesParjser.value
         : []
@@ -134,7 +148,7 @@ export function activate (context: vscode.ExtensionContext) {
         editor?.selection.active ?? new vscode.Position(0, 0)
       )
       const selectedText = document.getText(selection)
-      console.log(definedSassClasses)
+      // console.log(definedSassClasses)
       return definedSassClasses
         .filter(sassClass => sassClass.className === selectedText)
         .map(
