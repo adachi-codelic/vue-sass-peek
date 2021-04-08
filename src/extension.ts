@@ -1,7 +1,7 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode'
-import { eof, regexp, string } from 'parjs'
+import { eof, regexp, rest, string } from 'parjs'
 import {
   between,
   many,
@@ -11,7 +11,8 @@ import {
   thenq,
   manyTill,
   then,
-  flatten
+  flatten,
+  backtrack
 } from 'parjs/combinators'
 import * as pos from 'parjs/internal/parsers/position'
 import * as nl from 'parjs/internal/parsers/newline'
@@ -48,37 +49,53 @@ export function activate (context: vscode.ExtensionContext) {
         .pipe(then(string('</style>')))
         .pipe(then(spaces))
         .pipe(then(nl.newline()))
-      const sassClassContentLine = regexp(/.*/)
+      const sassClassContentLine = spaces
+        .pipe(qthen(regexp(/.*/)))
         .pipe(thenq(nl.newline()))
         .pipe(map(val => val[0]))
 
-      const mediaQuery = spaces
-        .pipe(then(string('@media')))
-        .pipe(then(regexp(/.*/)))
-        .pipe(then(nl.newline()))
-        .pipe(map(val => val[0][0][0][0] + val[0][0][1] + val[0][1] + val[1]))
+      // const mediaQuery = spaces
+      //   .pipe(then(string('@media')))
+      //   .pipe(then(regexp(/.*/)))
+      //   .pipe(then(nl.newline()))
+      //   .pipe(map(val => val[0][0][0][0] + val[0][0][1] + val[0][1] + val[1]))
 
-      // sassParserがstyleタグまで消費している
-      // たぶんここ
-      const sassClassContent = sassClassContentLine
-        .pipe(or(mediaQuery))
-        .pipe(many())
+      // // sassParserがstyleタグまで消費している
+      // // たぶんここ
+      // const sassClassContent = sassClassContentLine
+      //   .pipe(or(mediaQuery))
+      //   .pipe(many())
 
-      const sassComment = spaces
-        .pipe(then(string('//')))
-        .pipe(then(regexp(/.*/)))
-        .pipe(then(nl.newline()))
+      // const sassComment = spaces
+      //   .pipe(then(string('//')))
+      //   .pipe(then(regexp(/.*/)))
+      //   .pipe(then(nl.newline()))
 
-      const singleSassClass = mediaQuery
-        .pipe(many())
+      // const singleSassClass = mediaQuery
+      //   .pipe(or(sassComment))
+      //   .pipe(or(spaces))
+      //   .pipe(many())
+      //   .pipe(qthen(sassClassName))
+      //   .pipe(then(sassClassContent))
+      //   .pipe(between(regexp(/(?:\r\n|\s*\/\/.*(?:\r\n))*/)))
+      //   .pipe(then(pos.position()))
+      // const sassClasses = sassComment
+      //   .pipe(or(nl.newline()))
+      //   .pipe(many())
+      //   .pipe(qthen(singleSassClass.pipe(many())))
+      const singleSassClass = sassClassContentLine
+        .pipe(manyTill(sassClassName.pipe(backtrack())))
         .pipe(qthen(sassClassName))
-        .pipe(then(sassClassContent))
-        .pipe(between(regexp(/(?:\r\n|\s*\/\/.*(?:\r\n))*/)))
+        .pipe(
+          then(
+            sassClassContentLine.pipe(
+              manyTill(sassClassName.pipe(or(styleCloseTag)).pipe(backtrack()))
+            )
+          )
+        )
         .pipe(then(pos.position()))
-      const sassClasses = sassComment
-        .pipe(or(nl.newline()))
-        .pipe(many())
-        .pipe(qthen(singleSassClass.pipe(many())))
+      const sassClasses = singleSassClass.pipe(many())
+
       const sassParser = sassClasses.pipe(
         map(val => {
           return val.map(
@@ -103,7 +120,7 @@ export function activate (context: vscode.ExtensionContext) {
       const vueSassParser = otherPrevText
         .pipe(qthen(sassParser))
         .pipe(thenq(styleCloseTag))
-        .pipe(thenq(otherAfterText))
+        .pipe(thenq(rest()))
 
       const sassClassesParjser = vueSassParser.parse(targetText ?? '')
       console.log(sassClassesParjser)
