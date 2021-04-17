@@ -6,20 +6,11 @@
   "engines": {
     "vscode": "^1.52.0"
   },
+  "publisher": "adachi-t",
   "categories": ["Other"],
-  "activationEvents": [
-    "onLanguage:vue",
-    "onCommand:vue-sass-peek.vue-sass-peek"
-  ],
+  "activationEvents": ["onLanguage:vue"],
   "main": "./dist/extension.js",
-  "contributes": {
-    "commands": [
-      {
-        "command": "vue-sass-peek.vue-sass-peek",
-        "title": "Vue Sass Peek"
-      }
-    ]
-  },
+  "contributes": {},
   "scripts": {
     "vscode:prepublish": "npm run package",
     "compile": "webpack --config ./build/node-extension.webpack.config.js",
