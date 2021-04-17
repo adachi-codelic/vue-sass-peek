@@ -1,5 +1,5 @@
 import * as vscode from 'vscode'
-import { regexp, rest, string } from 'parjs'
+import { eof, regexp, rest, string } from 'parjs'
 import {
   many,
   map,
@@ -55,7 +55,7 @@ export class SassClassDefinitionProvider implements vscode.DefinitionProvider {
 
     // match a style close tag
     const styleCloseTag = spaces
-      .pipe(then(string('</styl>')))
+      .pipe(then(string('</style>')))
       .pipe(then(spaces))
       .pipe(then(nl.newline()))
       .pipe(recover(_ => ({ kind: 'Soft', value: softFailureValue })))
