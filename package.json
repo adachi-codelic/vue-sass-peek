@@ -7,6 +7,10 @@
     "vscode": "^1.52.0"
   },
   "publisher": "adachi-t",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/adachi-codelic/vue-sass-peek.git"
+  },
   "categories": ["Other"],
   "activationEvents": ["onLanguage:vue"],
   "main": "./dist/extension.js",
