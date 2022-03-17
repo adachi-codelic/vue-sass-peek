@@ -1,7 +1,7 @@
 # vue-css-peek README
 
-Vue + Sass で Peek ができるようにしました。
+vue-sass-peek is the vscode extension that enable you to peek simple Sass in a Vue file.
 
 ## Features
-
-Vue + Sass で Peek ができるようにしました。
+- peek a simple Sass class and id
+  - cannot parse complex class or id (e.g. nested selector)
