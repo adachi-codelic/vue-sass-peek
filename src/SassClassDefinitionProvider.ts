@@ -1,5 +1,5 @@
 import * as vscode from 'vscode'
-import { eof, regexp, rest, string } from 'parjs'
+import { regexp, rest, string } from 'parjs'
 import {
   many,
   map,
@@ -27,7 +27,7 @@ export class SassClassDefinitionProvider implements vscode.DefinitionProvider {
    */
   genSassClassDefinitionsFromText (text: string): SassClass[] {
     // match an identifier of Sass class
-    const classIdentifier: Parjser<[number, string]> = pos
+    const selectorIdentifier: Parjser<[number, string]> = pos
       .position() // get the start position of the class definition
       .pipe(then(regexp(/\S*/).pipe(map(val => val[0]))))
 
@@ -38,6 +38,13 @@ export class SassClassDefinitionProvider implements vscode.DefinitionProvider {
     // emulate "try" parser with using softFailure and backtrack() combinator
     const softFailureValue: [number, string][] = [[0, '']]
 
+    const sassIdName: Parjser<[number, string][]> = spaces
+    .pipe(qthen(string('#')))
+    .pipe(qthen(selectorIdentifier))
+    .pipe(thenq(spaces))
+    .pipe(manyTill(nl.newline()))
+    .pipe(recover(_ => ({ kind: 'Soft', value: softFailureValue })))
+
     // match a definition of Sass class name
     // support
     //  o - single defintion of the class
@@ -45,10 +52,12 @@ export class SassClassDefinitionProvider implements vscode.DefinitionProvider {
     //  x - nested class definitons
     const sassClassName: Parjser<[number, string][]> = spaces
       .pipe(qthen(string('.')))
-      .pipe(qthen(classIdentifier))
+      .pipe(qthen(selectorIdentifier))
       .pipe(thenq(spaces))
       .pipe(manyTill(nl.newline()))
       .pipe(recover(_ => ({ kind: 'Soft', value: softFailureValue })))
+
+    const sassSelectorName: Parjser<[number, string][]> = sassClassName.pipe(or(sassIdName))
 
     // match a style tag
     const styleOpenTag = regexp(/\s*<style.*>\s*/)
@@ -71,12 +80,12 @@ export class SassClassDefinitionProvider implements vscode.DefinitionProvider {
       [[number, string][], string[]],
       number
     ]> = sassClassContentLine
-      .pipe(manyTill(sassClassName.pipe(backtrack())))
-      .pipe(qthen(sassClassName))
+      .pipe(manyTill(sassSelectorName.pipe(backtrack())))
+      .pipe(qthen(sassSelectorName))
       .pipe(
         then(
           sassClassContentLine.pipe(
-            manyTill(styleCloseTag.pipe(or(sassClassName)).pipe(backtrack()))
+            manyTill(styleCloseTag.pipe(or(sassSelectorName)).pipe(backtrack()))
           )
         )
       )
